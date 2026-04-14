@@ -17,7 +17,6 @@
     html, body { height: 100%; margin: 0; background:#000; }
     .frame { position:fixed; inset:0; border:0; width:100%; height:100%; background:#000; }
 
-    /* Splash overlay */
     .splash {
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
@@ -76,29 +75,35 @@
       text-decoration: none;
       font-weight: 650;
     }
+    
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      opacity: .65;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
-
-  <!-- Splash -->
   <div class="splash" id="splash">
     <div class="card">
       <div class="logo">
-        <img src="icons/icon-192.png" alt="3v3 Basketball">
+        <img src="icons/icon-192.png" alt="3v3 Basketball Comp">
       </div>
       <div class="title">3v3 Basketball Comp</div>
-      <div class="muted">Loading…</div>
+        <div class="muted" id="loadingText">Loading…</div>
       <div class="spinner" aria-label="Loading"></div>
 
       <div class="fallback" id="fallback">
-        If this keeps spinning, your phone may need to open the app once in the browser to finish sign-in.
+        The in-app frame is taking too long to load. This can happen when sign-in cookies are blocked in embedded mode.
         <br>
-        <a class="btn" id="openLink" href="#" target="_blank" rel="noopener">Open in browser</a>
+        <a class="btn" id="openLink" href="#" target="_self" rel="noopener">Open app directly</a>
       </div>
+      
+       <div class="status" id="statusText"></div>
     </div>
   </div>
 
-  <!-- Your Apps Script app -->
   <iframe
     class="frame"
     id="appFrame"
@@ -108,29 +113,57 @@
   ></iframe>
 
   <script>
-    // Put your Apps Script /exec URL here
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyI9vetbGrLzCiwNgEHFgu2Bsy0-75ZsB2Kd8Dh9eRI25WdrZuvkoxh5WmyUuMaLRlS/exec";
 
     const frame = document.getElementById("appFrame");
     const splash = document.getElementById("splash");
     const fallback = document.getElementById("fallback");
     const openLink = document.getElementById("openLink");
+const loadingText = document.getElementById("loadingText");
+    const statusText = document.getElementById("statusText");
 
-    frame.src = GAS_URL;
+    let hasLoaded = false;
+    
     openLink.href = GAS_URL;
 
-    // Hide splash when iframe loads
-    frame.addEventListener("load", () => {
+   function setStatus(text) {
+      statusText.textContent = text;
+    }
+
+    function revealApp() {
       splash.classList.add("hide");
       setTimeout(() => splash.remove(), 350);
+       }
+
+    function showFallback(reason) {
+      if (hasLoaded) return;
+      loadingText.textContent = "Still loading…";
+      fallback.style.display = "block";
+      if (reason) setStatus(reason);
+    }
+
+    frame.addEventListener("load", () => {
+      hasLoaded = true;
+      setStatus("Connected.");
+      revealApp();
     });
 
-    // If it’s taking too long, show the fallback button
-    setTimeout(() => { fallback.style.display = "block"; }, 6000);
+     frame.addEventListener("error", () => {
+      showFallback("The embedded app failed to load.");
+    });
 
-    // Register service worker
+    // Fallback for browsers that don't dispatch iframe errors reliably.
+    setTimeout(() => {
+      showFallback("Embedded load timeout after 8 seconds.");
+    }, 8000);
+
+    frame.src = GAS_URL;
+    setStatus("Connecting to deployment…");
+
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./sw.js");
+       navigator.serviceWorker.register("./sw.js").catch((err) => {
+        console.warn("Service worker registration failed", err);
+      });
     }
   </script>
 </body>
